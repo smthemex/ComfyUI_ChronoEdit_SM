@@ -60,7 +60,7 @@ from diffusers import  GGUFQuantizationConfig
 from diffusers.hooks import apply_group_offloading
 #from diffusers import WanTransformer3DModel
 from ..chronoedit_diffusers.pipeline_chronoedit import ChronoEditPipeline
-#from ..chronoedit_diffusers.transformer_chronoedit import WanTransformer3DModel 
+from contextlib import contextmanager
 from ..chronoedit_diffusers.transformer_chronoedit_ import WanTransformer3DModel
 from .prompt_enhancer import load_model as load_prompt_enhancer
 from .prompt_enhancer import enhance_prompt
@@ -74,12 +74,12 @@ except:
     transfomer_vrsion_low=True
 from accelerate import init_empty_weights
 
-try:
-    diffusers_module = sys.modules.get('diffusers')
-    if diffusers_module:
-        setattr(diffusers_module, 'WanTransformer3DModel', WanTransformer3DModel)
-except Exception as e:
-    print(f"Warning: Could not register WanTransformer3DModel with diffusers module: {e}")
+# try:
+#     diffusers_module = sys.modules.get('diffusers')
+#     if diffusers_module:
+#         setattr(diffusers_module, 'WanTransformer3DModel', WanTransformer3DModel)
+# except Exception as e:
+#     print(f"Warning: Could not register WanTransformer3DModel with diffusers module: {e}")
 
 # Resolution presets
 RESOLUTION_PRESETS = {
@@ -88,6 +88,25 @@ RESOLUTION_PRESETS = {
     "1080p": 1080 * 1920,
 }
 
+@contextmanager
+def temp_patch_module_attr(module_name: str, attr_name: str, new_obj):
+    mod = sys.modules.get(module_name)
+    if mod is None:
+        yield
+        return
+    had = hasattr(mod, attr_name)
+    orig = getattr(mod, attr_name, None)
+    setattr(mod, attr_name, new_obj)
+    try:
+        yield
+    finally:
+        if had:
+            setattr(mod, attr_name, orig)
+        else:
+            try:
+                delattr(mod, attr_name)
+            except Exception:
+                pass
 
 def calculate_dimensions(image,  mod_value):
     """
@@ -118,19 +137,21 @@ def calculate_dimensions(image,  mod_value):
 def load_dit_model(ckpt_path, gguf_path,dir_path):
 
     if gguf_path is not None:
-        transformer = WanTransformer3DModel.from_single_file(
-            gguf_path,
-            config=os.path.join(dir_path, "Chrono/ChronoEdit-14B-Diffusers/transformer"),
-            quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
-            torch_dtype=torch.bfloat16,
-            )
+        with temp_patch_module_attr("diffusers", "WanTransformer3DModel", WanTransformer3DModel):
+            transformer = WanTransformer3DModel.from_single_file(
+                gguf_path,
+                config=os.path.join(dir_path, "Chrono/ChronoEdit-14B-Diffusers/transformer"),
+                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
+                torch_dtype=torch.bfloat16,
+                )
     elif ckpt_path is not None:
         from safetensors.torch import load_file
         sd=load_file(ckpt_path,device="cpu")
         sd=replace_key(sd)
         with init_empty_weights():
-            config=WanTransformer3DModel.load_config(os.path.join(dir_path, "Chrono/ChronoEdit-14B-Diffusers/transformer"))
-            transformer=WanTransformer3DModel.from_config(config)
+            with temp_patch_module_attr("diffusers", "WanTransformer3DModel", WanTransformer3DModel):
+                config=WanTransformer3DModel.load_config(os.path.join(dir_path, "Chrono/ChronoEdit-14B-Diffusers/transformer"))
+                transformer=WanTransformer3DModel.from_config(config)
         model_state_dict = transformer.state_dict()
         expected_keys = set(model_state_dict.keys())
         del transformer
@@ -141,8 +162,9 @@ def load_dit_model(ckpt_path, gguf_path,dir_path):
         missing_keys = expected_keys - set(sd.keys())
         if missing_keys:
             print(f"Warning: Missing keys in checkpoint: {missing_keys}")
-        del sd   
-        transformer = WanTransformer3DModel.from_single_file(filtered_sd,config=os.path.join(dir_path, "Chrono/ChronoEdit-14B-Diffusers/transformer"),torch_dtype=torch.bfloat16)
+        del sd  
+        with temp_patch_module_attr("diffusers", "WanTransformer3DModel", WanTransformer3DModel): 
+            transformer = WanTransformer3DModel.from_single_file(filtered_sd,config=os.path.join(dir_path, "Chrono/ChronoEdit-14B-Diffusers/transformer"),torch_dtype=torch.bfloat16)
         del filtered_sd
     vae_config = OmegaConf.load(os.path.join(dir_path, "Chrono/ChronoEdit-14B-Diffusers/vae/config.json")) 
     pipe = ChronoEditPipeline.from_pretrained(
