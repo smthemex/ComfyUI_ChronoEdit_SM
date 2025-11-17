@@ -91,7 +91,7 @@ class ChronoEdit_SM_Lora(io.ComfyNode):
             adapter_name_list=[]
             for path in lora_list:
                 if path is not None:
-                    name=os.path.basename(path).split('.')[0]
+                    name=os.path.splitext(os.path.basename(path))[0].replace(".", "_")
                     adapter_name_list.append(name)
                     if name in dit_list:
                         continue
@@ -109,7 +109,7 @@ class ChronoEdit_SM_Lora(io.ComfyNode):
             dit_list= model.get_list_adapters()['transformer']
             for name in dit_list:
                 if lora_list :
-                    name_list=[os.path.splitext(os.path.basename(i))[0] for i in lora_list ]
+                    name_list=[os.path.splitext(os.path.basename(i))[0].replace(".", "_") for i in lora_list ]
                     if name in name_list: #dit_list
                         continue
                     else:
