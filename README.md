@@ -2,10 +2,11 @@
 [ChronoEdit](https://github.com/nv-tlabs/ChronoEdit): Towards Temporal Reasoning for Image Editing and World Simulation,you can use this node in comfyUI,and Vram >8G
 
 # Update
-* support upscale lora  and fp8 dit，if use 8 step and upscale need step>12,if  use upscale only need steps>35
-*  支持fp8量化模型和放大lora，两个一起用时最好步数大一点，不用加速时，步数大于35
-* 推荐5帧8步lora/ use 5 frames 8 steps lora
-* 如果跑29帧要跑50步/ if use 29 frames need 50 steps
+* 支持新的画笔lora，垫图画几笔，提示词输入修改的内容即可，修复latent兼容性问题导致的偏色问题
+* 支持fp8量化模型和放大lora，两个lora一起用时最好步数大一点（8-12步）
+* support paintbrush lora ,fix lantens bug
+* support upscale lora  and fp8 dit，if use 8 step and upscale need step>12  
+
 
 
 1.Installation  
@@ -48,7 +49,10 @@ pip install -r requirements.txt
 ```
 
 # 4 Example
-![](https://github.com/smthemex/ComfyUI_ChronoEdit_SM/blob/main/example_workflows/example.png)
+* edit
+![](https://github.com/smthemex/ComfyUI_ChronoEdit_SM/blob/main/example_workflows/example.gif)
+* paintbrush
+![](https://github.com/smthemex/ComfyUI_ChronoEdit_SM/blob/main/example_workflows/example_paint.png)
 
 # 5 Citation
 ```
