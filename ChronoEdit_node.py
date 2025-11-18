@@ -8,7 +8,7 @@ from .Chrono.scripts.run_inference_diffusers import load_dit_model,load_prompt_e
 from .model_loader_utils import tensor_upscale,tensor2image,map_0_1_to_neg1_1,map_neg1_1_to_0_1
 from .Chrono.chronoedit_diffusers.pipeline_chronoedit import retrieve_latents
 import folder_paths
-
+import comfy.utils
 from einops import rearrange
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
@@ -318,10 +318,10 @@ class ChronoEdit_SM_Latent(io.ComfyNode):
         image_embeds=clip_vision.encode_image(image,crop=True)["penultimate_hidden_states"]
         if width==0 or height==0:
             width, height=calculate_dimensions(image, 16)
-        image = tensor_upscale(image, width, height) #BHWC
-
+        
         if isinstance(vae, AutoencoderKLWan):
             from diffusers.video_processor import VideoProcessor
+            image = tensor_upscale(image, width, height) #BHWC
             video_processor_ = VideoProcessor(vae_scale_factor=8)
             image=tensor2image(image)
            
@@ -337,8 +337,12 @@ class ChronoEdit_SM_Latent(io.ComfyNode):
             Latent = Latent.repeat(1, 1, 1, 1, 1)
             print(f"Latent shape: {Latent.shape}")
         else:
-            image = torch.cat([image, image.new_zeros(int(num_frames) - 1, image.shape[1],  image.shape[2], image.shape[3])], dim=0)
-            Latent=vae.encode(image)
+            start_image = comfy.utils.common_upscale(image[:num_frames].movedim(-1, 1), width, height, "bilinear", "center").movedim(1, -1)
+            image = torch.ones((num_frames, height, width, start_image.shape[-1]), device=start_image.device, dtype=start_image.dtype) * 0.5
+            image[:start_image.shape[0]] = start_image
+            Latent = vae.encode(image[:, :, :, :3])
+            # image = torch.cat([image, image.new_zeros(int(num_frames) - 1, image.shape[1],  image.shape[2], image.shape[3])], dim=0)
+            # Latent=vae.encode(image)
 
         cond={"samples":Latent,"num_frames":num_frames,"image_embeds":image_embeds}
         return io.NodeOutput(cond)
